@@ -19,13 +19,13 @@ Windows: For running start_all.bat (modify for Linux/macOS if needed)
 
 **Installation**
 1. Clone the Repository
-git clone https://github.com/<your-username>/<your-repo>.git
+git clone https://github.com/Sarvesh-13/Resume_Ranker.git
 cd <your-repo>
 
 2. Set Up a Virtual Environment
 python -m venv venv
 venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/macOS
+source venv/bin/activate  # Linux/macOS
 
 3. Install Dependencies
 Install required Python packages:
@@ -63,6 +63,7 @@ CREATE TABLE resumes (
 Download and install Kafka: Apache Kafka
 Start ZooKeeper and Kafka server (modify paths as needed):# Start ZooKeeper
 .\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+
 # Start Kafka
 .\bin\windows\kafka-server-start.bat .\config\server.properties
 
