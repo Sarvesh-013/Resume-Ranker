@@ -23,15 +23,16 @@ git clone https://github.com/Sarvesh-13/Resume_Ranker.git
 cd <your-repo>
 
 2. Set Up a Virtual Environment
-python -m venv venv
+ python -m venv venv
 venv\Scripts\activate  # Windows
+
 source venv/bin/activate  # Linux/macOS
 
-3. Install Dependencies
+4. Install Dependencies
 Install required Python packages:
 pip install -r requirements.txt
 
-4. Configure Environment Variables
+5. Configure Environment Variables
 Create a .env file in the project root with the following:
 KAFKA_TOPIC=resume-topic
 KAFKA_SERVER=localhost:9092
@@ -40,7 +41,7 @@ DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=resume_db
 
-5. Set Up MySQL
+6. Set Up MySQL
 Start MySQL and create a database:CREATE DATABASE resume_db;
 
 Create the resumes table:USE resume_db;
