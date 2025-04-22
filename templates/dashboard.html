@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Ranking Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding: 20px; }
+        .filter-section { margin-bottom: 20px; }
+        .table-responsive { max-height: 500px; overflow-x: auto; }
+        .pagination { margin-top: 20px; }
+        th, td { min-width: 150px; }
+        .skills-col { min-width: 250px; }
+        .positives-col { min-width: 250px; }
+        tr { cursor: pointer; }
+        .chart-container { margin-top: 30px; max-width: 500px; }
+    </style>
+</head>
+<body>
+    
+    <div class="container">
+        <h1 class="mb-4">Resume Ranking Dashboard</h1>
+        <a href="/" class="btn btn-primary mb-3">Back to Upload</a>
+
+        <!-- Visualizations -->
+        <div class="row">
+            <div class="col-md-6 chart-container">
+                <h5>Job Score Distribution</h5>
+                <canvas id="jobScoreChart"></canvas>
+            </div>
+            <div class="col-md-6 chart-container">
+                <h5>Top Skills</h5>
+                <canvas id="skillsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Filter and Search Section -->
+        <div class="filter-section">
+            <form id="filterForm">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="skills" class="form-label">Skills (comma-separated)</label>
+                        <input type="text" class="form-control" id="skills" placeholder="e.g., Python,SQL">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="min_score" class="form-label">Min Job Score</label>
+                        <input type="number" class="form-control" id="min_score" min="0" max="100" placeholder="0">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="max_score" class="form-label">Max Job Score</label>
+                        <input type="number" class="form-control" id="max_score" min="0" max="100" placeholder="100">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="name" class="form-label">Search by Name</label>
+                        <input type="text" class="form-control" id="name" placeholder="Enter name">
+                    </div>
+                    <div class="col-md-2 align-self-end">
+                        <button type="submit" class="btn btn-primary w-100">Apply</button>
+                        <button type="button" class="btn btn-secondary w-100 mt-2" onclick="resetFilters()">Reset</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Sorting Options -->
+        <div class="mb-3">
+            <label for="sort_by" class="form-label">Sort By:</label>
+            <select id="sort_by" class="form-select d-inline-block w-auto">
+                <option value="job_score">Job Score</option>
+                <option value="name">Name</option>
+            </select>
+            <select id="sort_order" class="form-select d-inline-block w-auto">
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+            </select>
+        </div>
+
+        <!-- Candidates Table -->
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th class="skills-col">Skills</th>
+                        <th>Job Score</th>
+                        <th class="positives-col">Positives</th>
+                    </tr>
+                </thead>
+                <tbody id="candidatesTable"></tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav class="pagination">
+            <ul class="pagination" id="pagination"></ul>
+        </nav>
+
+        <!-- Resume Modal -->
+        <div class="modal fade" id="resumeModal" tabindex="-1" aria-labelledby="resumeModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="resumeModalLabel">Resume</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="resumeContent"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <a id="downloadLink" class="btn btn-primary" style="display: none;">Download Resume</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        const socket = io();
+        let currentFilters = {
+            skills: '',
+            min_score: '',
+            max_score: '',
+            name: '',
+            sort_by: 'job_score',
+            sort_order: 'desc',
+            page: 1,
+            per_page: 10
+        };
+
+        // Charts
+        let jobScoreChart, skillsChart;
+
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                if (response.ok) {
+                    updateCharts(data);
+                }
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        function updateCharts(data) {
+            if (!jobScoreChart) {
+                jobScoreChart = new Chart(document.getElementById('jobScoreChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: data.job_score.labels,
+                        datasets: [{
+                            label: 'Candidates',
+                            data: data.job_score.values,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Number of Candidates' } },
+                            x: { title: { display: true, text: 'Job Score Range' } }
+                        }
+                    }
+                });
+            } else {
+                jobScoreChart.data.labels = data.job_score.labels;
+                jobScoreChart.data.datasets[0].data = data.job_score.values;
+                jobScoreChart.update();
+            }
+
+            if (!skillsChart) {
+                skillsChart = new Chart(document.getElementById('skillsChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: data.skills.labels,
+                        datasets: [{
+                            label: 'Occurrences',
+                            data: data.skills.values,
+                            backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: { beginAtZero: true, title: { display: true, text: 'Number of Resumes' } },
+                            x: { title: { display: true, text: 'Skills' } }
+                        }
+                    }
+                });
+            } else {
+                skillsChart.data.labels = data.skills.labels;
+                skillsChart.data.datasets[0].data = data.skills.values;
+                skillsChart.update();
+            }
+        }
+
+        async function fetchCandidates() {
+            const params = new URLSearchParams(currentFilters);
+            try {
+                const response = await fetch(`/api/resumes?${params}`);
+                const data = await response.json();
+                if (response.ok) {
+                    populateTable(data.resumes);
+                    updatePagination(data.total, data.page, data.per_page);
+                } else {
+                    alert('Error fetching data: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function populateTable(resumes) {
+            const tbody = document.getElementById('candidatesTable');
+            tbody.innerHTML = '';
+            resumes.forEach(resume => {
+                const row = document.createElement('tr');
+                row.dataset.id = resume.id;
+                row.innerHTML = `
+                    <td>${resume.name}</td>
+                    <td>${resume.phone}</td>
+                    <td>${resume.email}</td>
+                    <td>${resume.skills}</td>
+                    <td>${resume.job_score}</td>
+                    <td>${resume.positives}</td>
+                `;
+                row.addEventListener('click', () => showResume(resume.id, resume.file_path));
+                tbody.appendChild(row);
+            });
+        }
+
+        function updatePagination(total, page, per_page) {
+            const totalPages = Math.ceil(total / per_page);
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${page === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${page - 1})">Previous</a>`;
+            pagination.appendChild(prevLi);
+            for (let i = 1; i <= totalPages; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === page ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+                pagination.appendChild(li);
+            }
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${page === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${page + 1})">Next</a>`;
+            pagination.appendChild(nextLi);
+        }
+
+        function changePage(page) {
+            if (page < 1) return;
+            currentFilters.page = page;
+            fetchCandidates();
+        }
+
+        function showResume(id, file_path) {
+            const modal = new bootstrap.Modal(document.getElementById('resumeModal'));
+            const resumeContent = document.getElementById('resumeContent');
+            const downloadLink = document.getElementById('downloadLink');
+            const modalLabel = document.getElementById('resumeModalLabel');
+
+            resumeContent.innerHTML = '<div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>';
+
+            if (!file_path) {
+                resumeContent.innerHTML = '<p>Resume file not available.</p>';
+                downloadLink.style.display = 'none';
+                modal.show();
+                return;
+            }
+
+            const fileExt = file_path.split('.').pop().toLowerCase();
+            modalLabel.textContent = `Resume (ID: ${id})`;
+            downloadLink.href = `/resume/${id}`;
+            downloadLink.style.display = 'block';
+
+            if (fileExt === 'pdf') {
+                resumeContent.innerHTML = `<embed src="/resume/${id}" width="100%" height="500px" type="application/pdf">`;
+            } else {
+                resumeContent.innerHTML = `<p>Preview not available for ${fileExt.toUpperCase()} files. Use the download link below.</p>`;
+            }
+
+            modal.show();
+        }
+
+        document.getElementById('filterForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            currentFilters.skills = document.getElementById('skills').value.trim();
+            currentFilters.min_score = document.getElementById('min_score').value.trim();
+            currentFilters.max_score = document.getElementById('max_score').value.trim();
+            currentFilters.name = document.getElementById('name').value.trim();
+            currentFilters.page = 1;
+            fetchCandidates();
+        });
+
+        document.getElementById('sort_by').addEventListener('change', (e) => {
+            currentFilters.sort_by = e.target.value;
+            currentFilters.page = 1;
+            fetchCandidates();
+        });
+        document.getElementById('sort_order').addEventListener('change', (e) => {
+            currentFilters.sort_order = e.target.value;
+            currentFilters.page = 1;
+            fetchCandidates();
+        });
+
+        function resetFilters() {
+            document.getElementById('filterForm').reset();
+            currentFilters = {
+                skills: '',
+                min_score: '',
+                max_score: '',
+                name: '',
+                sort_by: 'job_score',
+                sort_order: 'desc',
+                page: 1,
+                per_page: 10
+            };
+            document.getElementById('sort_by').value = 'job_score';
+            document.getElementById('sort_order').value = 'desc';
+            fetchCandidates();
+        }
+
+        socket.on('new_resume', (data) => {
+            const skillsFilter = currentFilters.skills.toLowerCase().split(',').filter(s => s);
+            const minScore = parseInt(currentFilters.min_score) || 0;
+            const maxScore = parseInt(currentFilters.max_score) || 100;
+            const nameFilter = currentFilters.name.toLowerCase();
+
+            const resumeSkills = (data.skills || '').toLowerCase();
+            const resumeScore = parseInt(data.job_score) || 0;
+            const resumeName = (data.name || '').toLowerCase();
+
+            const matchesSkills = !skillsFilter.length || skillsFilter.every(s => resumeSkills.includes(s));
+            const matchesScore = resumeScore >= minScore && resumeScore <= maxScore;
+            const matchesName = !nameFilter || resumeName.includes(nameFilter);
+
+            if (matchesSkills && matchesScore && matchesName) {
+                const tbody = document.getElementById('candidatesTable');
+                const row = document.createElement('tr');
+                row.dataset.id = data.id || Math.random().toString(36).substr(2, 9);
+                row.innerHTML = `
+                    <td>${data.name || 'None'}</td>
+                    <td>${data.phone || 'None'}</td>
+                    <td>${data.email || 'None'}</td>
+                    <td>${data.skills || 'None'}</td>
+                    <td>${data.job_score || 0}</td>
+                    <td>${data.positives || 'None'}</td>
+                `;
+                row.addEventListener('click', () => showResume(row.dataset.id, data.file_path));
+                tbody.insertBefore(row, tbody.firstChild);
+                fetchStats();
+            }
+        });
+
+        // Initial load
+        fetchCandidates();
+        fetchStats();
+    </script>
+</body>
+</html>
