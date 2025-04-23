@@ -19,13 +19,15 @@ Windows: For running start_all.bat (modify for Linux/macOS if needed)
 
 Installation
 1. Clone the Repository
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/Sarvesh-013/Resume-Ranker.git
+
 
 2. Set Up a Virtual Environment
+
 python -m venv venv
+
 venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/macOS
+
 
 3. Install Dependencies
 Install required Python packages:
