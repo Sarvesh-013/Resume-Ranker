@@ -136,16 +136,3 @@ MySQL Errors: Verify DB_HOST, DB_USER, DB_PASSWORD, and DB_NAME in .env.
 Ollama Failures: Check if llama3.2 is pulled and the server is running (curl http://localhost:11434).
 UI Feedback Missing: Inspect browser console for SocketIO errors and ensure app.py is running.
 Reprocessing Resumes: Verify offset commits in logs (Committed Kafka offset).
-
-Contributing
-
-Fork the repository.
-Create a feature branch: git checkout -b feature-name
-Commit changes: git commit -m "Add feature"
-Push to the branch: git push origin feature-name
-Open a pull request.
-
-License
-MIT License
-Contact
-For issues or suggestions, open a GitHub issue or contact .
